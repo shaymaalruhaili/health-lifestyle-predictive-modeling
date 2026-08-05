@@ -1,0 +1,226 @@
+---
+Statistics for Data Science
+DS510
+14294
+
+title: "Exploring the Heath Lifestyle Database: Descriptive and Inferential Statistics"
+output: html_document
+date: "2025-11-17"
+
+Shaima Alruhaili - 250001381
+Supervised by: Dr. Nouf Alnajran
+
+---
+
+```{r}
+# Install libraries
+install.packages("dplyr")
+install.packages("readr")
+install.packages("ggplot2")
+
+# Load libraries
+library(dplyr)
+library(readr)
+library(ggplot2)
+```
+
+```{r}
+#-------------------------------------
+# Step 1: Read and inspect the database
+#-------------------------------------
+
+# Load database
+df <- read.csv("Health-Lifestyle Dataset.csv", stringsAsFactors = FALSE)
+
+# Display how many rows and columns the database have
+cat("Numbers of rows:", nrow(df), "\n")
+cat("Numbers of columns", ncol(df), "\n\n")
+
+# Display columns names
+cat("Columns Names are:\n")
+print(names(df))
+
+# Display first 5 rows of the database
+print ('First rows of the dataset:')
+print(head(df, 5))
+# -------------------------------------
+```
+
+```{r}
+# Check how many missing value per column
+cat("Nmber of missing values in each column:\n")
+print(colSums(is.na(df)))
+
+# Check how many missing value per row
+rows_with_na <- sum(!complete.cases(df))
+cat("\n Number of rows that contain missing values:", rows_with_na, "\n")
+```
+
+```{r}
+#-------------------------------------
+# Handle missing data
+#-------------------------------------
+df[] <- lapply(df, function(x) {
+  # Check whether column is text
+  if (is.character(x)) { 
+    x <- trimws(x)       # remove extra spaces
+    x[x == ""] <- NA     # convert empty string "" to NA
+  }
+  return(x)
+})
+
+# Categorical
+## Impute missing values with mode (most common value
+Mode <- function(x) names(which.max(table(x)))
+
+# Replace missing values with mode)
+df$Occupation[is.na(df$Occupation)] <- Mode(df$Occupation)
+df$BMI.Category[is.na(df$BMI.Category)] <- Mode(df$BMI.Category)
+df$Sleep.Disorder[is.na(df$Sleep.Disorder)] <- Mode(df$Sleep.Disorder)
+df$Blood.Pressure[is.na(df$Blood.Pressure)] <- Mode(df$Blood.Pressure)
+
+# Check how many missing value per column
+cat("Nmber of missing values in each column:\n")
+print(colSums(is.na(df)))
+
+```
+```{r}
+#-------------------------------------
+# Step 2: Descriptive statistics 
+#-------------------------------------
+
+# Blood Pressure must be split into systolic and diastolic
+df$Systolic <- as.numeric(sub("/.*", "", df$Blood.Pressure))
+df$Diastolic <- as.numeric(sub(".*/", "", df$Blood.Pressure))
+
+# Define categorical and numerical columns
+categorical_columns <- c("Gender", "Occupation", "BMI.Category", "Sleep.Disorder")
+numerical_columns <- c("Age", "Sleep.Duration", "Quality.of.Sleep", "Physical.Activity.Level", "Stress.Level", "Heart.Rate", "Daily.Steps", "Systolic", "Diastolic")
+
+# Print descriptive statistics for numerical variables
+cat("Descriptive Statistics for Numerical Variables:\n")
+for (col in numerical_columns) {
+  cat(paste("\n", col, "Descriptive Statistics:\n"))
+  print(summary(df[[col]]))   # Summary statistics (mean, median, range, etc.)
+  cat("Standard Deviation: ", sd(df[[col]], na.rm = TRUE), "\n")
+}
+
+# Print frequency tables for categorical variables
+cat("\nFrequency Tables for Categorical Variables:\n")
+for (col in categorical_columns) {
+  cat(paste("\n", col, "Frequency Table:\n"))
+  print(table(df[[col]]))  # Frequency table for categorical variables
+  cat("\n")
+}
+
+```
+```{r}
+#-------------------------------------
+# Step 3: Plot numeric variables (histograms)
+#-------------------------------------
+# List of numeric columns to plot
+numeric_vars <- c("Age", "Sleep.Duration", "Physical.Activity.Level",
+                  "Stress.Level", "Heart.Rate", "Daily.Steps")
+# Layout for 6 plots
+par(mfrow=c(2,3))
+
+# Create a histogram for each numeric variable
+for (v in numeric_vars) {
+  hist(df[[v]], main=paste("Histogram of", v),
+       xlab=v, col="lightblue", border="black")
+}
+
+# Reset layout
+par(mfrow=c(1,1))
+
+```
+```{r}
+#-------------------------------------
+# Step 4: Relationship of Age, Stress, Physical Activity with Blood Pressure
+#-------------------------------------
+
+# Simple linear regression (systolic)
+model <- lm(Systolic ~ Age + Stress.Level + Physical.Activity.Level, data=df)
+summary(model)
+```
+```{r}
+#-------------------------------------
+# Step 5: Correlation with Heart Rate
+#-------------------------------------
+
+# Convert gender + occupation to numeric codes
+df$Gender.num <- as.numeric(as.factor(df$Gender))
+df$Occupation.num <- as.numeric(as.factor(df$Occupation))
+
+# Correlations with Heart.Rate
+cat("Correlation between Gender (numeric) and Heart Rate:\n")
+print(cor(df$Gender.num, df$Heart.Rate, use="complete.obs", method = "pearson"))
+
+cat("\nCorrelation between Occupation (numeric) and Heart Rate:\n")
+print(cor(df$Occupation.num, df$Heart.Rate, use="complete.obs", method = "pearson"))
+
+cat("\nCorrelation between Daily Steps and Heart Rate:\n")
+print(cor(df$Daily.Steps, df$Heart.Rate, use="complete.obs", method = "pearson"))
+
+cat("\nCorrelation between Age and Heart Rate:\n")
+print(cor(df$Age, df$Heart.Rate, use="complete.obs", method = "pearson"))
+
+```
+```{r}
+# Plot correlations
+par(mfrow=c(2,2))
+plot(df$Gender.num, df$Heart.Rate, main="Gender vs Heart Rate")
+plot(df$Occupation.num, df$Heart.Rate, main="Occupation vs Heart Rate")
+plot(df$Daily.Steps, df$Heart.Rate, main="Daily Steps vs Heart Rate")
+plot(df$Age, df$Heart.Rate, main="Age vs Heart Rate")
+par(mfrow=c(1,1))
+```
+```{r}
+#-------------------------------------
+# Step 6: robability BMI = Normal given Occupation and Gender
+#-------------------------------------
+# 1. P(BMI = Normal | Occupation = Doctor)
+doctor_subset <- df[df$Occupation == "Doctor", ]
+mean(doctor_subset$BMI.Category == "Normal", na.rm = TRUE)
+```
+
+```{r}
+# 2. P(BMI = Normal | Gender = Male)
+male_subset <- df[df$Gender == "Male", ]
+mean(male_subset$BMI.Category == "Normal", na.rm = TRUE)
+```
+```{r}
+#-------------------------------------
+# Step 7: Outliers in Sleep Duration
+#-------------------------------------
+boxplot(df$Sleep.Duration, main="Sleep Duration Boxplot")
+```
+```{r}
+# Detect outliers
+sleep_outliers <- boxplot.stats(df$Sleep.Duration)$out
+sleep_outliers
+```
+```{r}
+#-------------------------------------
+# Step 8: Correlation with Sleep Disorder
+#-------------------------------------
+# Convert Sleep Disorder into numeric
+df$SleepDis.num <- as.numeric(as.factor(df$Sleep.Disorder))
+
+cat("Correlation between Blood Pressure and Sleep Disorder:\n")
+cor(df$Systolic, df$SleepDis.num, use="complete.obs", method = "pearson")
+cat("\n")
+
+cat("Correlation between Sleep Duration and Sleep Disorder:\n")
+cor(df$Sleep.Duration, df$SleepDis.num, use="complete.obs", method = "pearson")
+
+```
+
+```{r}
+# Graphical representation
+plot(df$Systolic, df$SleepDis.num,
+     main="Blood Pressure vs Sleep Disorder")
+plot(df$Sleep.Duration, df$SleepDis.num,
+     main="Sleep Duration vs Sleep Disorder")
+```
+
